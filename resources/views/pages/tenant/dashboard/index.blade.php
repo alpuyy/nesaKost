@@ -221,7 +221,7 @@
                             Temukan kost yang sesuai dengan kebutuhanmu.
                         </p>
 
-                        <a href="{{ route('customer.home') }}"
+                        <a href="{{ route('guest.home') }}"
                            class="mt-5 inline-flex rounded-lg bg-blue-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-800">
                             Cari Kost
                         </a>

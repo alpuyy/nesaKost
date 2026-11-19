@@ -46,4 +46,13 @@ class User extends Authenticatable
     {
         return $this->hasOne(Tenant::class, 'user_id');
     }
+
+    /**
+     * Nama lengkap user.
+     */
+    public function getFullNameAttribute(): string
+    {
+        $name = trim(($this->fname ?? '') . ' ' . ($this->lname ?? ''));
+        return $name !== '' ? $name : $this->email;
+    }
 }

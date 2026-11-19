@@ -2,6 +2,14 @@
 
 @section('title', $property->name . ' - nesaKost')
 
+@push('styles')
+    <style>
+        html {
+            scroll-behavior: auto;
+        }
+    </style>
+@endpush
+
 @section('content')
     <section class="bg-slate-50 py-12">
         <div class="mx-auto max-w-7xl px-6">
@@ -245,7 +253,7 @@
                                             {{ $availabilityCheck['message'] }}
                                         </p>
 
-                                        
+
                                         @if ($availabilityCheck['available'])
                                             <form action="{{ route('tenant.bookings.store') }}" method="POST"
                                                 class="mt-4">

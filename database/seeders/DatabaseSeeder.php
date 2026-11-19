@@ -44,7 +44,8 @@ class DatabaseSeeder extends Seeder
                 ['email' => 'tenant06@ekost.test', 'fname' => 'Dewi', 'lname' => 'Anggraini', 'phone' => '081300000006', 'address' => 'Madiun', 'role' => 'tenant'],
                 ['email' => 'tenant07@ekost.test', 'fname' => 'Yoga', 'lname' => 'Prakoso', 'phone' => '081300000007', 'address' => 'Jombang', 'role' => 'tenant'],
                 ['email' => 'tenant08@ekost.test', 'fname' => 'Intan', 'lname' => 'Permata', 'phone' => '081300000008', 'address' => 'Mojokerto', 'role' => 'tenant'],
-            ];
+                ['email' => 'ade@gmail.com', 'fname' => 'Ade', 'lname' => 'Sopian', 'phone' => '081300000009', 'address' => 'Ketintang', 'role' => 'tenant'],
+                ];
 
             $userIds = [];
             foreach ($userDefinitions as $definition) {
@@ -91,6 +92,7 @@ class DatabaseSeeder extends Seeder
                 ['tenant06@ekost.test', 'Mahasiswa Psikologi', 'Wati Anggraini', '082100000006'],
                 ['tenant07@ekost.test', 'Mahasiswa Ekonomi', 'Bambang Prakoso', '082100000007'],
                 ['tenant08@ekost.test', 'Mahasiswa Sistem Informasi', 'Sari Permata', '082100000008'],
+                ['ade@gmail.com', 'Mahasiswa Sistem Informasi', 'Ade Sopian', '082100000009'],
             ];
 
             foreach ($tenantProfiles as [$email, $profession, $emergencyName, $emergencyNumber]) {
