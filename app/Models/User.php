@@ -48,6 +48,14 @@ class User extends Authenticatable
     }
 
     /**
+     * OTP verifikasi email yang sedang berlaku untuk pengguna.
+     */
+    public function emailVerificationOtp(): HasOne
+    {
+        return $this->hasOne(EmailVerificationOtp::class);
+    }
+
+    /**
      * Nama lengkap user.
      */
     public function getFullNameAttribute(): string

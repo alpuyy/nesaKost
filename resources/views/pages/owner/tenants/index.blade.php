@@ -3,207 +3,133 @@
 @section('title', 'Data Penyewa')
 
 @section('main')
-    <div class="space-y-6 text-slate-800">
-        @include('pages.owner.tenants.partials.flash')
-
-        {{-- Header Section --}}
-        <section class="flex flex-col gap-4 rounded-xl bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+    @php
+        $statusLabels = [
+            'active' => 'Aktif',
+            'scheduled' => 'Terjadwal',
+            'booking_pending' => 'Menunggu Pembayaran',
+            'historical' => 'Riwayat',
+        ];
+        $statusClasses = [
+            'active' => 'bg-emerald-50 text-emerald-700',
+            'scheduled' => 'bg-sky-50 text-sky-700',
+            'booking_pending' => 'bg-amber-50 text-amber-700',
+            'historical' => 'bg-slate-100 text-slate-600',
+        ];
+        $money = fn($value) => 'Rp ' . number_format((float) $value, 0, ',', '.');
+    @endphp
+    <div class="space-y-6">
+        <section
+            class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h1 class="text-2xl font-bold">Data Penyewa</h1>
-                <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                    Kelola dan pantau informasi penghuni/penyewa, kontak darurat, dan status sewa aktif dari seluruh cabang kos milikmu.
-                </p>
+                <h1 class="text-2xl font-bold text-slate-900">Data Penyewa</h1>
+                <p class="mt-1 text-sm text-slate-500">Pantau penyewa yang pernah bertransaksi di seluruh cabang yang kamu
+                    kelola.</p>
             </div>
         </section>
 
-        {{-- Statistik Cards --}}
-        <section class="grid gap-4 md:grid-cols-3">
-            <div class="rounded-xl bg-white p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Total Penyewa</p>
-                <div class="mt-3 flex items-end justify-between">
-                    <p class="text-3xl font-bold">{{ $totalTenants }} <span class="text-base font-medium text-slate-500">Orang</span></p>
-                </div>
-            </div>
-
-            <div class="rounded-xl bg-white p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Penyewa Aktif</p>
-                <div class="mt-3 flex items-end justify-between">
-                    <p class="text-3xl font-bold">{{ $activeTenants }} <span class="text-base font-medium text-slate-500">Orang</span></p>
-                    <span class="rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
-                        {{ $totalTenants > 0 ? round(($activeTenants / $totalTenants) * 100) : 0 }}% Sedang Menghuni
-                    </span>
-                </div>
-            </div>
-
-            <div class="rounded-xl bg-white p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Riwayat Selesai</p>
-                <div class="mt-3 flex items-end justify-between">
-                    <p class="text-3xl font-bold">{{ $completedTenants }} <span class="text-base font-medium text-slate-500">Orang</span></p>
-                    <span class="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Alumni Penghuni</span>
-                </div>
-            </div>
+        <section class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <article class="rounded-xl border border-slate-100 bg-white p-4">
+                <p class="text-xs text-slate-500">Total Penyewa</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ number_format($summary['total']) }}</p>
+            </article>
+            <article class="rounded-xl border border-slate-100 bg-white p-4">
+                <p class="text-xs text-slate-500">Penyewa Aktif</p>
+                <p class="mt-2 text-2xl font-bold text-emerald-700">{{ number_format($summary['active']) }}</p>
+            </article>
+            <article class="rounded-xl border border-slate-100 bg-white p-4">
+                <p class="text-xs text-slate-500">Menunggu Pembayaran</p>
+                <p class="mt-2 text-2xl font-bold text-amber-700">{{ number_format($summary['booking_pending']) }}</p>
+            </article>
+            <article class="rounded-xl border border-slate-100 bg-white p-4">
+                <p class="text-xs text-slate-500">Riwayat</p>
+                <p class="mt-2 text-2xl font-bold text-slate-600">{{ number_format($summary['historical']) }}</p>
+            </article>
         </section>
 
-        {{-- Table & Filters Section --}}
-        <section class="overflow-hidden rounded-xl bg-white shadow-sm">
-            <div class="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
-                <form method="GET" action="{{ route('owner.tenants.index') }}" class="flex w-full flex-col gap-2 md:max-w-4xl md:flex-row">
-                    <input type="search" name="q" value="{{ $search }}"
-                        placeholder="Cari nama, email, no HP, atau profesi..."
-                        class="w-full rounded-lg border-0 bg-indigo-50 px-4 py-3 text-sm outline-none ring-blue-300 focus:ring-2">
-
-                    <select name="branch" class="rounded-lg border-0 bg-indigo-50 px-4 py-3 text-sm outline-none ring-blue-300 focus:ring-2">
-                        <option value="">Semua cabang</option>
-                        @foreach ($branches as $branch)
-                            <option value="{{ $branch->id }}" @selected((string) $branchId === (string) $branch->id)>
-                                {{ $branch->name }}
-                            </option>
-                        @endforeach
-                    </select>
-
-                    <select name="status" class="rounded-lg border-0 bg-indigo-50 px-4 py-3 text-sm outline-none ring-blue-300 focus:ring-2">
-                        <option value="">Semua status</option>
-                        <option value="active" @selected($status === 'active')>Aktif Menyewa</option>
-                        <option value="inactive" @selected($status === 'inactive')>Riwayat Selesai</option>
-                    </select>
-
-                    <button type="submit" class="rounded-lg bg-blue-900 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-800">
-                        Cari
-                    </button>
-
-                    @if ($search !== '' || $branchId || $status)
-                        <a href="{{ route('owner.tenants.index') }}" class="rounded-lg bg-slate-100 px-4 py-3 text-center text-sm font-medium text-slate-600 hover:bg-slate-200">
-                            Reset
-                        </a>
-                    @endif
-                </form>
-
-                <a href="{{ route('owner.tenants.index') }}" title="Muat ulang" class="self-end rounded-lg p-2 text-slate-500 hover:bg-slate-100">↻</a>
-            </div>
-
+        <section class="overflow-hidden rounded-xl border border-slate-100 bg-white">
+            <form method="GET" action="{{ route('owner.tenants.index') }}"
+                class="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                <select name="branch_id" class="rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
+                    <option value="">Semua Cabang</option>
+                    @foreach ($branches as $branch)
+                        <option value="{{ $branch->id }}" @selected((string) $branchId === (string) $branch->id)>{{ $branch->name }}</option>
+                    @endforeach
+                </select>
+                <select name="status" class="rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
+                    <option value="all">Semua Status</option>
+                    @foreach ($statusLabels as $value => $label)
+                        <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <input type="search" name="q" value="{{ $search }}"
+                    placeholder="Cari nama, email, atau nomor HP"
+                    class="rounded-lg border border-slate-200 px-3 py-2.5 text-sm">
+                <div class="flex gap-2"><button
+                        class="flex-1 rounded-lg bg-blue-900 hover:bg-blue-800 px-4 py-2.5 text-sm font-semibold text-white">Terapkan</button><a
+                        href="{{ route('owner.tenants.index') }}"
+                        class="rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600">Reset</a></div>
+            </form>
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[1000px] text-left text-sm">
-                    <thead class="bg-indigo-50 text-xs uppercase tracking-wide text-slate-600">
+                <table class="w-full min-w-[850px] text-left text-sm">
+                    <thead class="bg-indigo-50 text-[11px] uppercase tracking-wide text-slate-600">
                         <tr>
-                            <th class="px-6 py-4">Penyewa</th>
-                            <th class="px-6 py-4">Kontak & Profesi</th>
-                            <th class="px-6 py-4">Kontak Darurat</th>
-                            <th class="px-6 py-4">Kamar & Cabang</th>
-                            <th class="px-6 py-4">Periode Sewa</th>
-                            <th class="px-6 py-4">Status Sewa</th>
-                            <th class="px-6 py-4 text-right">Aksi</th>
+                            <th class="px-5 py-4">Penyewa</th>
+                            <th class="px-5 py-4">Kontak</th>
+                            <th class="px-5 py-4">Transaksi Terakhir</th>
+                            <th class="px-5 py-4">Cabang</th>
+                            <th class="px-5 py-4">Status</th>
+                            <th class="px-5 py-4 text-right">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @forelse($tenants as $tenant)
+                    <tbody class="divide-y divide-slate-100 text-xs text-slate-600">
+                        @forelse ($tenants as $tenant)
                             @php
-                                $activeRent = $tenant->rents->firstWhere('status', 'active');
-                                $latestRent = $activeRent ?? $tenant->rents->first();
+                                $user = $tenant->user;
+                                $name = trim(($user?->fname ?? '') . ' ' . ($user?->lname ?? '')) ?: 'Penyewa';
+                                $latest = $tenant->latest_transaction;
                             @endphp
                             <tr class="hover:bg-slate-50">
-                                {{-- Nama Penyewa --}}
-                                <td class="px-6 py-5">
-                                    <a href="{{ route('owner.tenants.show', $tenant->id) }}" class="font-semibold text-slate-900 hover:text-blue-800">
-                                        {{ $tenant->user?->full_name ?? '—' }}
-                                    </a>
-                                    <p class="mt-0.5 text-xs text-slate-500">{{ $tenant->user?->email }}</p>
+                                <td class="px-5 py-4">
+                                    <p class="font-semibold text-slate-800">{{ $name }}</p>
+                                    <p class="mt-1 text-slate-400">{{ $user?->email ?? '-' }}</p>
                                 </td>
-
-                                {{-- Kontak & Profesi --}}
-                                <td class="px-6 py-5">
-                                    <p class="font-medium text-slate-800">{{ $tenant->user?->phone_number ?: '—' }}</p>
-                                    <p class="mt-0.5 text-xs text-slate-500">{{ $tenant->profession ?: 'Profesi belum diatur' }}</p>
-                                </td>
-
-                                {{-- Kontak Darurat --}}
-                                <td class="px-6 py-5">
-                                    @if($tenant->emergency_name)
-                                        <p class="font-medium text-slate-800">{{ $tenant->emergency_name }}</p>
-                                        <p class="mt-0.5 text-xs text-slate-500">{{ $tenant->emergency_number ?: 'No. HP belum diatur' }}</p>
-                                    @else
-                                        <span class="text-xs text-slate-400">Belum diatur</span>
-                                    @endif
-                                </td>
-
-                                {{-- Kamar & Cabang --}}
-                                <td class="px-6 py-5">
-                                    @if($latestRent && $latestRent->room)
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="font-semibold text-slate-900">{{ $latestRent->room->room_code }}</span>
-                                            <span class="text-xs text-slate-400">({{ $latestRent->room->type }})</span>
-                                        </div>
-                                        <p class="mt-0.5 text-xs font-medium text-blue-800">
-                                            {{ $latestRent->room->branch?->name ?? 'Cabang tidak ditemukan' }}
+                                <td class="px-5 py-4">{{ $user?->phone_number ?: '-' }}</td>
+                                <td class="px-5 py-4">
+                                    @if ($latest)
+                                        <p class="font-medium text-slate-800">
+                                            {{ $latest->rent_code ?? ($latest->booking_code ?? ($latest instanceof \App\Models\Rent ? 'Rent #' : 'Booking #') . $latest->id) }}
                                         </p>
+                                        <p class="mt-1 text-slate-400">{{ $latest->room?->room_code ?? '-' }}</p>
                                     @else
-                                        <span class="text-xs text-slate-400">Belum ada sewa</span>
+                                        -
                                     @endif
                                 </td>
-
-                                {{-- Periode Sewa --}}
-                                <td class="px-6 py-5">
-                                    @if($activeRent)
-                                        <p class="text-xs font-semibold text-slate-800">
-                                            {{ $activeRent->start_date?->format('d M Y') }} s/d {{ $activeRent->end_date?->format('d M Y') }}
-                                        </p>
-                                        <p class="mt-0.5 text-[11px] text-slate-500">
-                                            Sisa {{ max(0, (int) now()->diffInDays($activeRent->end_date, false)) }} hari
-                                        </p>
-                                    @elseif($latestRent)
-                                        <span class="text-xs text-slate-500">
-                                            Berakhir {{ $latestRent->end_date?->format('d M Y') }}
-                                        </span>
-                                    @else
-                                        <span class="text-xs text-slate-400">—</span>
-                                    @endif
+                                <td class="px-5 py-4">{{ $latest?->room?->branchDorm?->name ?? 'Lihat detail transaksi' }}
                                 </td>
-
-                                {{-- Status Sewa --}}
-                                <td class="px-6 py-5">
-                                    @if($activeRent)
-                                        <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                                            Aktif Menyewa
-                                        </span>
-                                    @elseif($latestRent && $latestRent->status === 'scheduled')
-                                        <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                                            Menunggu Mulai
-                                        </span>
-                                    @elseif($latestRent && $latestRent->status === 'completed')
-                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                                            Riwayat Selesai
-                                        </span>
-                                    @else
-                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                                            Belum Aktif
-                                        </span>
-                                    @endif
+                                <td class="px-5 py-4"><span
+                                        class="rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $statusClasses[$tenant->derived_status] ?? 'bg-slate-100 text-slate-600' }}">{{ $statusLabels[$tenant->derived_status] ?? 'Riwayat' }}</span>
                                 </td>
-
-                                {{-- Aksi --}}
-                                <td class="px-6 py-5 text-right">
-                                    <a href="{{ route('owner.tenants.show', $tenant->id) }}" class="font-semibold text-blue-800 hover:underline">
-                                        Detail
-                                    </a>
-                                </td>
+                                <td class="px-5 py-4 text-right"><a href="{{ route('owner.tenants.show', $tenant->public_id) }}"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-[#315F96] hover:bg-slate-50">Detail
+                                        <i data-feather="arrow-up-right" class="h-3.5 w-3.5"></i></a></td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-16 text-center text-slate-500">
-                                    Belum ada data penyewa yang cocok.
+                                <td colspan="6" class="px-5 py-12 text-center"><i data-feather="users"
+                                        class="mx-auto h-8 w-8 text-slate-300"></i>
+                                    <p class="mt-3 font-semibold text-slate-700">Belum ada data penyewa</p>
+                                    <p class="mt-1 text-xs text-slate-400">Penyewa akan muncul setelah memiliki transaksi di
+                                        cabang milikmu.</p>
                                 </td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-
-            {{-- Pagination Footer --}}
-            <div class="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
-                <p>
-                    Menampilkan {{ $tenants->firstItem() ?? 0 }}–{{ $tenants->lastItem() ?? 0 }} dari {{ $tenants->total() }} penyewa
-                </p>
-                {{ $tenants->links() }}
-            </div>
+            @if ($tenants->hasPages())
+                <div class="border-t border-slate-100 px-5 py-4">{{ $tenants->links() }}</div>
+            @endif
         </section>
     </div>
 @endsection

@@ -1,298 +1,209 @@
 @extends('components.layouts.owner.container')
 
-@section('title', 'Detail Penyewa - ' . ($tenant->user?->full_name ?? 'Penyewa'))
+@section('title', 'Detail Penyewa')
 
 @section('main')
-    <div class="space-y-6 text-slate-800">
-        @include('pages.owner.tenants.partials.flash')
+    @php
+        $user = $tenant->user;
+        $name = trim(($user?->fname ?? '') . ' ' . ($user?->lname ?? '')) ?: 'Penyewa';
+        $statusLabels = [
+            'active' => 'Aktif',
+            'scheduled' => 'Terjadwal',
+            'booking_pending' => 'Menunggu Pembayaran',
+            'historical' => 'Riwayat',
+        ];
+        $statusClasses = [
+            'active' => 'bg-emerald-50 text-emerald-700',
+            'scheduled' => 'bg-sky-50 text-sky-700',
+            'booking_pending' => 'bg-amber-50 text-amber-700',
+            'historical' => 'bg-slate-100 text-slate-600',
+        ];
+        $eventClasses = [
+            'booking' => 'bg-indigo-50 text-indigo-700',
+            'payment' => 'bg-emerald-50 text-emerald-700',
+            'rent' => 'bg-sky-50 text-sky-700',
+        ];
+        $eventIcons = ['booking' => 'calendar', 'payment' => 'credit-card', 'rent' => 'file-text'];
+        $eventStatus = [
+            'pending_payment' => 'Menunggu Pembayaran',
+            'confirmed' => 'Dikonfirmasi',
+            'expired' => 'Kedaluwarsa',
+            'cancelled' => 'Dibatalkan',
+            'paid' => 'Berhasil',
+            'pending' => 'Menunggu',
+            'failed' => 'Gagal',
+            'scheduled' => 'Terjadwal',
+            'active' => 'Berjalan',
+            'completed' => 'Selesai',
+        ];
+        $money = fn($value) => 'Rp ' . number_format((float) $value, 0, ',', '.');
+    @endphp
+    <div class="space-y-6">
+        <section
+            class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div><a href="{{ route('owner.tenants.index') }}"
+                    class="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-[#315F96] hover:underline"><i
+                        data-feather="arrow-left" class="h-3.5 w-3.5"></i> Kembali ke Data Penyewa</a>
+                <h1 class="text-2xl font-bold text-slate-900">Detail Penyewa</h1>
+                <p class="mt-1 text-sm text-slate-500">Informasi profil dan seluruh riwayat transaksi di cabang milik Owner.
+                </p>
+            </div>
+            <span
+                class="w-fit rounded-full px-3 py-1.5 text-xs font-semibold {{ $statusClasses[$tenant->derived_status] ?? 'bg-slate-100 text-slate-600' }}">{{ $statusLabels[$tenant->derived_status] ?? 'Riwayat' }}</span>
+        </section>
 
-        {{-- Header Breadcrumb & Title --}}
-        <section class="rounded-xl bg-white p-6 shadow-sm">
-            <p class="text-sm text-slate-500">
-                <a href="{{ route('owner.tenants.index') }}" class="hover:text-blue-800">Data Penyewa</a> / 
-                <span class="font-semibold text-blue-800">Detail Penyewa</span>
-            </p>
-            <div class="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold">{{ $tenant->user?->full_name ?? 'Penyewa' }}</h1>
-                    <div class="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                        <span class="font-semibold text-blue-800">{{ $tenant->profession ?: 'Profesi belum diatur' }}</span>
-                        <span>•</span>
-                        <span>{{ $tenant->user?->email }}</span>
-                        <span>•</span>
-                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $activeRent ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">
-                            {{ $activeRent ? 'Sedang Menyewa' : 'Tidak Ada Sewa Aktif' }}
-                        </span>
+        <section class="grid gap-4 lg:grid-cols-2">
+            <article class="rounded-xl border border-slate-100 bg-white p-5 lg:col-span-1">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-lg font-bold text-[#315F96]">
+                        {{ strtoupper(substr($name, 0, 1)) }}</div>
+                    <div class="min-w-0">
+                        <h2 class="truncate font-bold text-slate-900">{{ $name }}</h2>
                     </div>
                 </div>
+                <div class="mt-5 space-y-4 text-sm">
+                    <div>
+                        <p class="text-xs text-slate-400">Email</p>
+                        <p class="mt-1 break-all font-medium text-slate-700">{{ $user?->email ?: '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Nomor HP</p>
+                        <p class="mt-1 font-medium text-slate-700">{{ $user?->phone_number ?: '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Alamat</p>
+                        <p class="mt-1 font-medium text-slate-700">{{ $user?->address ?: '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Pekerjaan</p>
+                        <p class="mt-1 font-medium text-slate-700">{{ $tenant->profession ?: '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Kontak Darurat</p>
+                        <p class="mt-1 font-medium text-slate-700">{{ $tenant->emergency_name ?: '-' }}</p>
+                        <p class="text-xs text-slate-500">{{ $tenant->emergency_number ?: '' }}</p>
+                    </div>
+                </div>
+                <p class="mt-5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500"><i data-feather="lock"
+                        class="mr-1 inline h-3.5 w-3.5"></i> Informasi profil bersifat read-only. Pengelola hanya dapat
+                    melakukan monitoring.</p>
+            </article>
+            <div class="flex flex-col gap-4">
+                <section class="rounded-xl border border-slate-100 bg-white p-5 sm:p-6">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900">Informasi Sewa Saat Ini</h2>
+                            <p class="mt-1 text-xs text-slate-500">Informasi kamar dan periode sewa yang sedang berlangsung.
+                            </p>
+                        </div>
+                        @if ($currentRent)
+                            <span
+                                class="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Sedang
+                                Ditempati</span>
+                        @else
+                            <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">Tidak
+                                Ada Sewa Aktif</span>
+                        @endif
+                    </div>
 
-                @if($tenant->user?->phone_number)
-                    <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/\D/', '', $tenant->user->phone_number)) }}" 
-                       target="_blank" rel="noopener noreferrer"
-                       class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
-                        <span>Hubungi WhatsApp</span>
-                    </a>
-                @endif
+                    @if ($currentRent)
+                        <div class="grid gap-4 sm:grid-cols-3">
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <p class="text-xs text-slate-400">Kamar</p>
+                                <p class="mt-1 font-semibold text-slate-800">{{ $currentRent->room?->room_code ?? '-' }}
+                                </p>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <p class="text-xs text-slate-400">Cabang Kost</p>
+                                <p class="mt-1 font-semibold text-slate-800">
+                                    {{ $currentRent->room?->branchDorm?->name ?? '-' }}</p>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 p-4">
+                                <p class="text-xs text-slate-400">Periode Sewa</p>
+                                <p class="mt-1 font-semibold text-slate-800">
+                                    {{ $currentRent->start_date?->format('d M Y') ?? '-' }} –
+                                    {{ $currentRent->end_date?->format('d M Y') ?? '-' }}
+                                </p>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-xs text-slate-500">Kode sewa:
+                            {{ $currentRent->rent_code ?: 'Rent #' . $currentRent->id }}</p>
+                    @else
+                        <div class="rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                            Penyewa ini tidak memiliki transaksi sewa berstatus aktif yang mencakup hari ini.
+                        </div>
+                    @endif
+                </section>
+                <div class="grid grid-cols-2 gap-3">
+                    <article class="rounded-xl border border-slate-100 bg-white p-5">
+                        <p class="text-xs text-slate-500">Total Booking</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                            {{ number_format($transactionSummary['bookings']) }}</p>
+                    </article>
+                    <article class="rounded-xl border border-slate-100 bg-white p-5">
+                        <p class="text-xs text-slate-500">Total Sewa</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-900">{{ number_format($transactionSummary['rents']) }}
+                        </p>
+                    </article>
+                    <article class="rounded-xl border border-slate-100 bg-white p-5">
+                        <p class="text-xs text-slate-500">Total Pembayaran</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-900">
+                            {{ number_format($transactionSummary['payments']) }}</p>
+                    </article>
+                    <article class="rounded-xl border border-slate-100 bg-white p-5">
+                        <p class="text-xs text-slate-500">Pembayaran Berhasil</p>
+                        <p class="mt-2 text-xl font-bold text-emerald-700">{{ $money($transactionSummary['paid']) }}</p>
+                    </article>
+                </div>
             </div>
         </section>
 
-        {{-- Main Content Grid --}}
-        <section class="grid gap-6 lg:grid-cols-3">
-            {{-- Kolom Kiri: Rincian Lengkap --}}
-            <div class="space-y-6 lg:col-span-2">
-                {{-- Card 1: Informasi Pribadi & Kontak --}}
-                <div class="rounded-xl bg-white p-6 shadow-sm">
-                    <h2 class="text-lg font-bold text-slate-900">Informasi Pribadi & Kontak</h2>
-                    <div class="mt-4 grid gap-5 sm:grid-cols-2">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nama Lengkap</p>
-                            <p class="mt-1 font-medium text-slate-900">{{ $tenant->user?->full_name ?? '—' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Email</p>
-                            <p class="mt-1 font-medium text-slate-900">{{ $tenant->user?->email ?? '—' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nomor Telepon / WhatsApp</p>
-                            <p class="mt-1 font-medium text-slate-900">{{ $tenant->user?->phone_number ?: 'Belum diisi' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Profesi / Pekerjaan</p>
-                            <p class="mt-1 font-medium text-slate-900">{{ $tenant->profession ?: 'Belum diisi' }}</p>
-                        </div>
-                        <div class="sm:col-span-2">
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Alamat Asal</p>
-                            <p class="mt-1 font-medium text-slate-900">{{ $tenant->user?->address ?: 'Belum diisi' }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Card 2: Kontak Darurat --}}
-                <div class="rounded-xl bg-white p-6 shadow-sm">
-                    <h2 class="text-lg font-bold text-slate-900">Kontak Darurat</h2>
-                    <div class="mt-4 grid gap-5 sm:grid-cols-2">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nama Kontak Darurat</p>
-                            <p class="mt-1 font-medium text-slate-900">{{ $tenant->emergency_name ?: 'Belum diatur' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nomor Telepon Darurat</p>
-                            <p class="mt-1 font-medium text-slate-900">{{ $tenant->emergency_number ?: 'Belum diatur' }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Card 3: Sewa Aktif Saat Ini (Jika Ada) --}}
-                @if($activeRent)
-                    <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-6 shadow-sm">
-                        <div class="flex items-center justify-between">
-                            <h2 class="text-lg font-bold text-emerald-950">Sewa Aktif Saat Ini</h2>
-                            <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                                Sedang Berjalan
-                            </span>
-                        </div>
-                        <div class="mt-4 grid gap-5 sm:grid-cols-2">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Kamar & Cabang</p>
-                                <p class="mt-1 text-lg font-bold text-slate-900">
-                                    {{ $activeRent->room?->room_code }} ({{ $activeRent->room?->type }})
-                                </p>
-                                <p class="text-xs font-medium text-blue-900">{{ $activeRent->room?->branch?->name }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Total Harga Sewa</p>
-                                <p class="mt-1 text-lg font-bold text-slate-900">
-                                    Rp {{ number_format((float) $activeRent->total_price, 0, ',', '.') }}
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Periode Sewa</p>
-                                <p class="mt-1 font-medium text-slate-900">
-                                    {{ $activeRent->start_date?->format('d M Y') }} s/d {{ $activeRent->end_date?->format('d M Y') }}
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Sisa Waktu</p>
-                                <p class="mt-1 font-bold text-emerald-900">
-                                    {{ max(0, (int) now()->diffInDays($activeRent->end_date, false)) }} hari lagi
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                {{-- Card 4: Riwayat Sewa Kamar --}}
-                <div class="overflow-hidden rounded-xl bg-white shadow-sm">
-                    <div class="border-b border-slate-100 p-6">
-                        <h2 class="text-lg font-bold text-slate-900">Riwayat Transaksi Sewa</h2>
-                        <p class="mt-1 text-xs text-slate-500">Seluruh riwayat sewa kamar penyewa di cabang milik kamu.</p>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-indigo-50 text-xs uppercase tracking-wide text-slate-600">
-                                <tr>
-                                    <th class="px-6 py-4">Kode Sewa</th>
-                                    <th class="px-6 py-4">Kamar & Cabang</th>
-                                    <th class="px-6 py-4">Periode</th>
-                                    <th class="px-6 py-4">Total Biaya</th>
-                                    <th class="px-6 py-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @forelse($tenant->rents as $rent)
-                                    @php
-                                        $rentStatusClasses = [
-                                            'active' => 'bg-emerald-100 text-emerald-800',
-                                            'scheduled' => 'bg-amber-100 text-amber-800',
-                                            'completed' => 'bg-slate-100 text-slate-600',
-                                            'cancelled' => 'bg-red-100 text-red-800',
-                                        ];
-                                        $rentStatusLabels = [
-                                            'active' => 'Aktif',
-                                            'scheduled' => 'Terjadwal',
-                                            'completed' => 'Selesai',
-                                            'cancelled' => 'Dibatalkan',
-                                        ];
-                                    @endphp
-                                    <tr class="hover:bg-slate-50">
-                                        <td class="px-6 py-4 font-semibold text-slate-900">
-                                            {{ $rent->rent_code ?: 'RENT-' . $rent->id }}
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <p class="font-medium text-slate-900">{{ $rent->room?->room_code }}</p>
-                                            <p class="text-xs text-blue-800">{{ $rent->room?->branch?->name }}</p>
-                                        </td>
-                                        <td class="px-6 py-4 text-xs text-slate-600">
-                                            {{ $rent->start_date?->format('d M Y') }} s/d {{ $rent->end_date?->format('d M Y') }}
-                                        </td>
-                                        <td class="px-6 py-4 font-semibold text-slate-900">
-                                            Rp {{ number_format((float) $rent->total_price, 0, ',', '.') }}
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $rentStatusClasses[$rent->status] ?? 'bg-slate-100 text-slate-600' }}">
-                                                {{ $rentStatusLabels[$rent->status] ?? ucfirst($rent->status) }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="5" class="px-6 py-8 text-center text-slate-400">
-                                            Belum ada riwayat sewa kamar.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {{-- Card 5: Riwayat Pengajuan Booking --}}
-                <div class="overflow-hidden rounded-xl bg-white shadow-sm">
-                    <div class="border-b border-slate-100 p-6">
-                        <h2 class="text-lg font-bold text-slate-900">Riwayat Pengajuan Booking</h2>
-                        <p class="mt-1 text-xs text-slate-500">Catatan pengajuan pemesanan kamar oleh penyewa.</p>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-indigo-50 text-xs uppercase tracking-wide text-slate-600">
-                                <tr>
-                                    <th class="px-6 py-4">Kode Booking</th>
-                                    <th class="px-6 py-4">Kamar</th>
-                                    <th class="px-6 py-4">Tipe & Durasi</th>
-                                    <th class="px-6 py-4">Harga</th>
-                                    <th class="px-6 py-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @forelse($tenant->bookings as $booking)
-                                    @php
-                                        $bookingStatusClasses = [
-                                            'confirmed' => 'bg-emerald-100 text-emerald-800',
-                                            'pending_payment' => 'bg-amber-100 text-amber-800',
-                                            'expired' => 'bg-slate-100 text-slate-600',
-                                            'cancelled' => 'bg-red-100 text-red-800',
-                                        ];
-                                        $bookingStatusLabels = [
-                                            'confirmed' => 'Terkonfirmasi',
-                                            'pending_payment' => 'Menunggu Bayar',
-                                            'expired' => 'Kedaluwarsa',
-                                            'cancelled' => 'Dibatalkan',
-                                        ];
-                                    @endphp
-                                    <tr class="hover:bg-slate-50">
-                                        <td class="px-6 py-4 font-semibold text-slate-900">
-                                            {{ $booking->booking_code ?: 'BK-' . $booking->id }}
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <p class="font-medium text-slate-900">{{ $booking->room?->room_code }}</p>
-                                            <p class="text-xs text-blue-800">{{ $booking->room?->branch?->name }}</p>
-                                        </td>
-                                        <td class="px-6 py-4 text-xs text-slate-600">
-                                            <span class="capitalize">{{ $booking->booking_type }}</span> ({{ $booking->duration_month }} bulan)
-                                        </td>
-                                        <td class="px-6 py-4 font-semibold text-slate-900">
-                                            Rp {{ number_format((float) $booking->price_snapshot, 0, ',', '.') }}
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $bookingStatusClasses[$booking->status] ?? 'bg-slate-100 text-slate-600' }}">
-                                                {{ $bookingStatusLabels[$booking->status] ?? ucfirst($booking->status) }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="5" class="px-6 py-8 text-center text-slate-400">
-                                            Belum ada riwayat booking.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <section class="rounded-xl border border-slate-100 bg-white p-5 sm:p-6">
+            <div class="mb-5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">Riwayat Transaksi</h2>
+                    <p class="text-xs text-slate-500">Booking, pembayaran, dan sewa dari seluruh cabang milik Owner,
+                        diurutkan dari yang terbaru.</p>
+                </div><span class="text-xs text-slate-400">{{ $events->count() }} aktivitas</span>
             </div>
-
-            {{-- Kolom Kanan: Aside Ringkasan --}}
-            <aside class="h-fit rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="text-lg font-bold text-slate-900">Ringkasan Penyewa</h2>
-                <dl class="mt-4 space-y-4 text-sm">
-                    <div>
-                        <dt class="text-slate-500">ID Penyewa</dt>
-                        <dd class="mt-1 font-semibold text-slate-900">#{{ $tenant->id }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-slate-500">Status Penghuni</dt>
-                        <dd class="mt-1 font-semibold {{ $activeRent ? 'text-emerald-700' : 'text-slate-700' }}">
-                            {{ $activeRent ? 'Penghuni Aktif' : 'Tidak Sedang Menyewa' }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-slate-500">Kamar Aktif Saat Ini</dt>
-                        <dd class="mt-1 font-semibold text-slate-900">
-                            {{ $activeRent ? $activeRent->room?->room_code . ' - ' . $activeRent->room?->branch?->name : 'Tidak ada' }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-slate-500">Total Transaksi Sewa</dt>
-                        <dd class="mt-1 font-semibold text-slate-900">{{ $tenant->rents->count() }} kali</dd>
-                    </div>
-                    <div>
-                        <dt class="text-slate-500">Total Booking Diajukan</dt>
-                        <dd class="mt-1 font-semibold text-slate-900">{{ $tenant->bookings->count() }} kali</dd>
-                    </div>
-                    <div>
-                        <dt class="text-slate-500">Terdaftar Sejak</dt>
-                        <dd class="mt-1 font-semibold text-slate-900">
-                            {{ $tenant->created_at?->format('d M Y, H:i') ?? '—' }}
-                        </dd>
-                    </div>
-                </dl>
-
-                <a href="{{ route('owner.tenants.index') }}" 
-                   class="mt-6 inline-flex w-full justify-center rounded-lg bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200">
-                    Kembali ke daftar
-                </a>
-            </aside>
+            @if ($events->isEmpty())
+                <div class="py-12 text-center"><i data-feather="clock" class="mx-auto h-8 w-8 text-slate-300"></i>
+                    <p class="mt-3 font-semibold text-slate-700">Belum ada riwayat transaksi</p>
+                </div>
+            @else
+                <div class="space-y-0">
+                    @foreach ($events as $event)
+                        <article
+                            class="relative flex gap-4 border-l border-slate-200 pb-6 pl-6 last:border-l-transparent last:pb-0">
+                            <div
+                                class="absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full {{ $eventClasses[$event['type']] ?? 'bg-slate-100 text-slate-600' }}">
+                                <i data-feather="{{ $eventIcons[$event['type']] ?? 'activity' }}" class="h-4 w-4"></i>
+                            </div>
+                            <div class="min-w-0 flex-1 rounded-xl border border-slate-100 p-4">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <h3 class="font-semibold text-slate-800">{{ $event['title'] }}</h3>
+                                        <p class="mt-1 text-xs text-slate-500">{{ $event['code'] }}</p>
+                                    </div>
+                                    <div class="sm:text-right">
+                                        <p class="text-xs text-slate-400">
+                                            {{ $event['date']?->format('d M Y, H:i') ?? '-' }}</p><span
+                                            class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{{ $eventStatus[$event['status']] ?? ucfirst($event['status']) }}</span>
+                                    </div>
+                                </div>
+                                <p class="mt-3 text-xs text-slate-600">{{ $event['description'] }}</p>
+                                @if ($event['period'])
+                                    <p class="mt-1 text-xs text-slate-500">Periode: {{ $event['period'] }}</p>
+                                @endif
+                                @if ($event['amount'] !== null)
+                                    <p class="mt-3 text-sm font-bold text-slate-800">{{ $money($event['amount']) }}</p>
+                                @endif
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+            @endif
         </section>
     </div>
 @endsection

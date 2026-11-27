@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,20 +8,31 @@
     <meta name="description" content="Temukan kost dekat UNESA Kampus Ketintang dan Lidah Wetan dengan nesaKost.">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script src="https://unpkg.com/feather-icons@4.29.2"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        body { font-family: 'Poppins', sans-serif; }
-        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
     </style>
 
     @stack('styles')
 </head>
-<body class="bg-white text-slate-800 antialiased">
-    @include('components.layouts.guest.navbar')
+
+<body class="bg-white text-slate-800 antialiased" data-guest-motion>
+    @if (auth()->check() && auth()->user()->role === 'tenant')
+        @include('components.layouts.tenant.navbar')
+    @else
+        @include('components.layouts.guest.navbar')
+    @endif
 
     <main>
         @yield('content')
@@ -28,6 +40,12 @@
 
     @include('components.layouts.guest.footer')
 
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.feather) window.feather.replace();
+        });
+    </script>
     @stack('scripts')
 </body>
+
 </html>

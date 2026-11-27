@@ -1,7 +1,7 @@
 @props(['property'])
 
-<div class="group overflow-hidden rounded-xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-lg">
-    <a href="{{ route('guest.properties.show', $property->id) }}">
+<div data-motion-item data-motion-hover class="group overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow duration-300 hover:shadow-xl">
+    <a href="{{ route('guest.properties.show', $property) }}">
         <div class="relative aspect-[4/3] overflow-hidden bg-slate-100">
             @if($property->image_path)
                 <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($property->image_path) }}"
@@ -37,7 +37,7 @@
                         <span class="text-xs font-normal text-slate-500">/ bulan</span>
                     </p>
                 </div>
-                <span class="text-sm font-medium text-blue-900">Lihat detail →</span>
+                <span class="inline-flex items-center gap-1 text-sm font-medium text-blue-900">Lihat detail <i data-feather="arrow-right" class="h-4 w-4"></i></span>
             </div>
         </div>
     </a>

@@ -80,6 +80,13 @@
                     </div>
 
                     <div class="flex justify-between gap-4">
+                        <span class="text-sm text-slate-500">Jenis Booking</span>
+                        <span class="text-sm font-semibold text-slate-800">
+                            {{ $booking->booking_type === 'renewal' ? 'Perpanjangan Sewa' : 'Booking Baru' }}
+                        </span>
+                    </div>
+
+                    <div class="flex justify-between gap-4">
                         <span class="text-sm text-slate-500">Kode Kamar</span>
                         <span class="text-sm font-semibold text-slate-800">
                             {{ $booking->room->room_code }}
@@ -129,8 +136,14 @@
 
                 {{-- AKSI BOOKING --}}
                 @if ($booking->status === 'pending_payment')
+                    @if ($booking->booking_type === 'renewal')
+                        <div class="mt-6 rounded-lg border border-blue-100 bg-blue-50 p-4">
+                            <p class="text-sm font-semibold text-blue-950">Batas pembayaran perpanjangan</p>
+                            <p class="mt-1 text-sm text-blue-900">Selesaikan pembayaran paling lambat {{ $booking->expires_at?->format('d M Y, H:i') ?? '-' }} WIB. Kamar ditahan selama periode ini.</p>
+                        </div>
+                    @endif
                     <div class="mt-8 space-y-3">
-                        <a href="{{ route('tenant.bookings.payments.create', $booking->id) }}"
+                        <a href="{{ route('tenant.bookings.payments.create', $booking->booking_code) }}"
                             class="block w-full rounded-lg bg-blue-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-950">
                             {{ $latestPayment && $latestPayment->status === 'pending' && $latestPayment->payment_method
                                 ? 'Lihat / Ubah Metode Pembayaran'

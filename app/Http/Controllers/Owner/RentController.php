@@ -3,130 +3,169 @@
 namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
-use App\Models\BranchDorm;
-use App\Models\Rent;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class RentController extends Controller
 {
-    /**
-     * Cabang yang dimiliki owner yang sedang login.
-     */
-    private function ownerBranches(Request $request)
+    private function ownerContext(Request $request): array
     {
-        return BranchDorm::query()
-            ->whereHas('owner', fn ($query) =>
-                $query->where('user_id', $request->user()->id)
-            );
-    }
+        $ownerId = DB::table('owners')
+            ->where('user_id', $request->user()->id)
+            ->value('id');
 
-    /**
-     * Daftar seluruh transaksi sewa kamar di cabang milik owner.
-     */
-    public function index(Request $request): View
-    {
-        $search = trim((string) $request->query('q', ''));
-        $branchId = $request->query('branch');
-        $status = $request->query('status');
+        abort_unless($ownerId, 403, 'Data owner tidak ditemukan.');
 
-        $branches = $this->ownerBranches($request)
+        $branches = DB::table('branch_dorm')
+            ->where('owner_id', $ownerId)
+            ->select('id', 'name')
             ->orderBy('name')
             ->get();
 
-        $ownedBranchIds = $branches->pluck('id');
+        $branchId = $request->query('branch_id');
 
-        // Pastikan filter cabang benar-benar milik owner
         if ($branchId !== null && $branchId !== '') {
-            abort_unless($branches->contains('id', (int) $branchId), 404);
+            abort_unless(
+                $branches->contains(fn ($branch) => (string) $branch->id === (string) $branchId),
+                404
+            );
+            $branchId = (int) $branchId;
+        } else {
+            $branchId = null;
         }
 
-        // Base query: Sewa yang kamarnya berada di cabang milik owner
-        $baseQuery = Rent::query()
-            ->whereHas('room', fn ($q) => $q->whereIn('branch_dorm_id', $ownedBranchIds));
+        return [$ownerId, $branches, $branchId];
+    }
 
-        // Hitung statistik transaksi sewa
-        $totalRents = (clone $baseQuery)->count();
-        $activeRents = (clone $baseQuery)->where('status', 'active')->count();
-        $scheduledRents = (clone $baseQuery)->where('status', 'scheduled')->count();
-        $completedRents = (clone $baseQuery)->where('status', 'completed')->count();
-        $totalRevenue = (clone $baseQuery)->whereIn('status', ['active', 'completed'])->sum('total_price');
+    private function validatedFilters(Request $request): array
+    {
+        $validated = $request->validate([
+            'month' => ['nullable', 'integer', 'between:1,12'],
+            'year' => ['nullable', 'integer', 'between:2000,' . (now()->year + 1)],
+            'status' => ['nullable', 'string', 'max:30'],
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
 
-        // Query data sewa dengan eager loading
-        $rentsQuery = Rent::query()
-            ->with([
-                'tenant.user',
-                'room.branch',
-                'booking',
-            ])
-            ->whereHas('room', fn ($q) => $q->whereIn('branch_dorm_id', $ownedBranchIds));
+        return [
+            filled($validated['month'] ?? null) ? (int) $validated['month'] : null,
+            filled($validated['year'] ?? null) ? (int) $validated['year'] : null,
+            $validated['status'] ?? 'all',
+            trim($validated['q'] ?? ''),
+        ];
+    }
 
-        // Filter kata kunci pencarian
+    private function applyPeriodFilter($query, string $column, ?int $month, ?int $year)
+    {
+        return $query
+            ->when($month !== null, fn ($q) => $q->whereMonth($column, $month))
+            ->when($year !== null, fn ($q) => $q->whereYear($column, $year));
+    }
+
+    public function index(Request $request): View
+    {
+        [$ownerId, $branches, $branchId] = $this->ownerContext($request);
+
+        [$month, $year, $status, $search] = $this->validatedFilters($request);
+
+        $query = DB::table('rent as rt')
+            ->join('room as rm', 'rm.id', '=', 'rt.room_id')
+            ->join('branch_dorm as b', 'b.id', '=', 'rm.branch_dorm_id')
+            ->leftJoin('tenants as t', 't.id', '=', 'rt.tenant_id')
+            ->leftJoin('users as u', 'u.id', '=', 't.user_id')
+            ->where('b.owner_id', $ownerId)
+            ->when(
+                $branchId !== null,
+                fn ($q) => $q->where('b.id', $branchId)
+            );
+
+        $this->applyPeriodFilter(
+            $query,
+            'rt.created_at',
+            $month,
+            $year
+        );
+
+        if ($status !== 'all') {
+            abort_unless(
+                in_array($status, ['scheduled', 'active', 'completed', 'cancelled'], true),
+                404
+            );
+
+            $query->where('rt.status', $status);
+        }
+
         if ($search !== '') {
-            $rentsQuery->where(function ($query) use ($search) {
-                $query->where('rent_code', 'like', "%{$search}%")
-                    ->orWhereHas('room', function ($rq) use ($search) {
-                        $rq->where('room_code', 'like', "%{$search}%")
-                            ->orWhere('type', 'like', "%{$search}%")
-                            ->orWhereHas('branch', fn ($bq) => $bq->where('name', 'like', "%{$search}%"));
-                    })
-                    ->orWhereHas('tenant.user', function ($uq) use ($search) {
-                        $uq->where('fname', 'like', "%{$search}%")
-                            ->orWhere('lname', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%")
-                            ->orWhere('phone_number', 'like', "%{$search}%");
-                    });
+            $query->where(function ($q) use ($search) {
+                $q->where('rt.rent_code', 'like', "%{$search}%")
+                    ->orWhere('rm.room_code', 'like', "%{$search}%")
+                    ->orWhere('b.name', 'like', "%{$search}%")
+                    ->orWhere('u.fname', 'like', "%{$search}%")
+                    ->orWhere('u.lname', 'like', "%{$search}%");
             });
         }
 
-        // Filter cabang kos
-        if ($branchId !== null && $branchId !== '') {
-            $rentsQuery->whereHas('room', fn ($rq) => $rq->where('branch_dorm_id', (int) $branchId));
-        }
+        // Ringkasan kontrak mengikuti filter cabang dan periode.
+        $summaryQuery = DB::table('rent as rt')
+            ->join('room as rm', 'rm.id', '=', 'rt.room_id')
+            ->join('branch_dorm as b', 'b.id', '=', 'rm.branch_dorm_id')
+            ->where('b.owner_id', $ownerId)
+            ->when(
+                $branchId !== null,
+                fn ($q) => $q->where('b.id', $branchId)
+            );
 
-        // Filter status sewa
-        if ($status !== null && $status !== '') {
-            $rentsQuery->where('status', $status);
-        }
+        $this->applyPeriodFilter(
+            $summaryQuery,
+            'rt.created_at',
+            $month,
+            $year
+        );
 
-        $rents = $rentsQuery
-            ->latest('id')
-            ->paginate(10)
+        $summary = [
+            'total' => (clone $summaryQuery)->count(),
+            'scheduled' => (clone $summaryQuery)
+                ->where('rt.status', 'scheduled')
+                ->count(),
+            'active' => (clone $summaryQuery)
+                ->where('rt.status', 'active')
+                ->count(),
+            'completed' => (clone $summaryQuery)
+                ->where('rt.status', 'completed')
+                ->count(),
+            'cancelled' => (clone $summaryQuery)
+                ->where('rt.status', 'cancelled')
+                ->count(),
+        ];
+
+        $rents = $query->select(
+            'rt.id',
+            'rt.rent_code',
+            'rt.booking_id',
+            'rt.start_date',
+            'rt.end_date',
+            'rt.status',
+            'rt.total_price',
+            'rt.created_at',
+            'rm.room_code',
+            'b.name as branch_name',
+            'u.fname',
+            'u.lname'
+        )
+            ->orderByDesc('rt.created_at')
+            ->orderByDesc('rt.id')
+            ->paginate(15)
             ->withQueryString();
 
-        return view('pages.owner.rents.index', [
-            'rents' => $rents,
-            'branches' => $branches,
-            'search' => $search,
-            'branchId' => $branchId,
-            'status' => $status,
-            'totalRents' => $totalRents,
-            'activeRents' => $activeRents,
-            'scheduledRents' => $scheduledRents,
-            'completedRents' => $completedRents,
-            'totalRevenue' => $totalRevenue,
-        ]);
-    }
-
-    /**
-     * Detail transaksi sewa kamar beserta rincian kamar, penyewa, dan pembayaran.
-     */
-    public function show(Request $request, int $id): View
-    {
-        $branches = $this->ownerBranches($request)->get();
-        $ownedBranchIds = $branches->pluck('id');
-
-        $rent = Rent::query()
-            ->with([
-                'tenant.user',
-                'room.branch',
-                'booking.payments',
-            ])
-            ->whereHas('room', fn ($q) => $q->whereIn('branch_dorm_id', $ownedBranchIds))
-            ->findOrFail($id);
-
-        return view('pages.owner.rents.show', [
-            'rent' => $rent,
-        ]);
+        return view('pages.owner.rents.index', compact(
+            'rents',
+            'summary',
+            'branches',
+            'branchId',
+            'month',
+            'year',
+            'status',
+            'search'
+        ));
     }
 }

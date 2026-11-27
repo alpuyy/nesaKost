@@ -7,6 +7,8 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Room;
 use App\Services\RoomAvailabilityService;
+use App\Services\TenantRentalPeriodGuard;
+use App\Services\OwnerNotificationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +18,8 @@ class BookingController extends Controller
 {
     public function store(
         Request $request,
-        RoomAvailabilityService $availabilityService
+        RoomAvailabilityService $availabilityService,
+        TenantRentalPeriodGuard $periodGuard
     ) {
         $validated = $request->validate([
             'room_id' => ['required', 'integer', 'exists:room,id'],
@@ -38,18 +41,7 @@ class BookingController extends Controller
             abort(403, 'Data tenant tidak ditemukan.');
         }
 
-        // Satu tenant hanya boleh memiliki satu rent aktif/scheduled.
-        $hasActiveRent = $tenant->rents()
-            ->whereIn('status', ['scheduled', 'active'])
-            ->exists();
-
-        if ($hasActiveRent) {
-            throw ValidationException::withMessages([
-                'room_id' => 'Kamu masih memiliki masa sewa yang aktif. Selesaikan masa sewa tersebut sebelum melakukan booking baru.',
-            ]);
-        }
-
-        $startDate = CarbonImmutable::parse($validated['start_date']);
+        $startDate = CarbonImmutable::parse($validated['start_date'])->startOfDay();
 
         $durationMonth = (int) $validated['duration_month'];
 
@@ -63,12 +55,28 @@ class BookingController extends Controller
             $startDate,
             $endDate,
             $durationMonth,
-            $availabilityService
+            $availabilityService,
+            $periodGuard
         ) {
+            // Kunci baris tenant terlebih dahulu agar booking reguler dan
+            // renewal untuk tenant yang sama tidak lolos secara bersamaan.
+            $lockedTenant = $periodGuard->lockTenant($tenant->id);
+
+            if ($periodGuard->hasConflict($lockedTenant, $startDate, $endDate)) {
+                throw ValidationException::withMessages([
+                    'room_id' => 'Periode yang kamu pilih bertabrakan dengan masa sewa atau booking lain yang masih menunggu pembayaran. Pilih periode tanggal yang berbeda.',
+                ]);
+            }
+
             // Kunci baris kamar selama transaksi untuk mengurangi risiko
             // dua booking bersamaan pada kamar yang sama.
             $room = Room::query()
                 ->whereKey($validated['room_id'])
+                ->where('status', config('ekost.room_active_status', 'active'))
+                ->whereHas('branchDorm', fn ($query) => $query->where(
+                    'status',
+                    config('ekost.property_active_status', 'active')
+                ))
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -122,12 +130,14 @@ class BookingController extends Controller
             return $booking;
         });
 
+        app(OwnerNotificationService::class)->bookingCreated($booking);
+
         return redirect()
-            ->route('tenant.bookings.show', $booking->id)
+            ->route('tenant.bookings.show', $booking->booking_code)
             ->with('success', 'Booking berhasil dibuat. Silakan lanjutkan pembayaran.');
     }
 
-    public function cancel(Request $request, int $id)
+    public function cancel(Request $request, string $bookingCode)
     {
         $validated = $request->validate([
             'cancellation_reason' => ['nullable', 'string', 'max:1000'],
@@ -136,11 +146,12 @@ class BookingController extends Controller
         $tenant = $request->user()->tenant;
         abort_if(!$tenant, 403);
 
-        $result = DB::transaction(function () use ($tenant, $id, $validated) {
+        $result = DB::transaction(function () use ($tenant, $bookingCode, $validated) {
             $booking = Booking::query()
                 ->where('tenant_id', $tenant->id)
+                ->where('booking_code', $bookingCode)
                 ->lockForUpdate()
-                ->findOrFail($id);
+                ->firstOrFail();
 
             // Booking yang sudah dibayar tidak boleh dibatalkan tenant.
             $payments = $booking->payments()
@@ -184,26 +195,31 @@ class BookingController extends Controller
             return 'cancelled';
         });
 
+        if ($result === 'cancelled') {
+            $cancelledBooking = Booking::with(['room.branchDorm', 'tenant.user'])->where('booking_code', $bookingCode)->first();
+            if ($cancelledBooking) app(OwnerNotificationService::class)->bookingCancelled($cancelledBooking);
+        }
+
         return match ($result) {
             'cancelled' => redirect()
-                ->route('tenant.bookings.show', $id)
+                ->route('tenant.bookings.show', $bookingCode)
                 ->with('success', 'Booking berhasil dibatalkan. Kamar sekarang tersedia kembali.'),
 
             'already_paid' => redirect()
-                ->route('tenant.bookings.show', $id)
+                ->route('tenant.bookings.show', $bookingCode)
                 ->with('error', 'Booking yang sudah dibayar tidak dapat dibatalkan.'),
 
             'expired' => redirect()
-                ->route('tenant.bookings.show', $id)
+                ->route('tenant.bookings.show', $bookingCode)
                 ->with('error', 'Masa pembayaran telah berakhir. Booking berstatus kedaluwarsa.'),
 
             default => redirect()
-                ->route('tenant.bookings.show', $id)
+                ->route('tenant.bookings.show', $bookingCode)
                 ->with('error', 'Booking ini tidak dapat dibatalkan.'),
         };
     }
 
-    public function show(Request $request, int $id)
+    public function show(Request $request, string $bookingCode)
     {
         $tenant = $request->user()->tenant;
 
@@ -212,7 +228,8 @@ class BookingController extends Controller
         $booking = Booking::query()
             ->with(['room', 'payments'])
             ->where('tenant_id', $tenant->id)
-            ->findOrFail($id);
+            ->where('booking_code', $bookingCode)
+            ->firstOrFail();
 
         return view('pages.tenant.bookings.show', compact('booking'));
     }

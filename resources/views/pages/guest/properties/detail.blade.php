@@ -11,16 +11,21 @@
 @endpush
 
 @section('content')
-    <section class="bg-slate-50 py-12">
+    <section data-page="property-detail" class="bg-slate-50 py-12">
         <div class="mx-auto max-w-7xl px-6">
 
-            {{-- HEADER PROPERTI --}}
-            <a href="{{ route('guest.home') }}" class="text-sm text-blue-900 hover:underline">
-                ← Kembali ke pencarian
-            </a>
+            {{-- BREADCRUMB --}}
+            <nav data-property-breadcrumb aria-label="Breadcrumb" class="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                <a href="{{ route('guest.home') }}" class="hover:text-blue-900 hover:underline">
+                    Cari Kost
+                </a>
+                <span aria-hidden="true">/</span>
+                <span class="font-medium text-blue-900"> {{ $property->name }} </span>
+            </nav>
 
-            <div class="mt-8">
-                <h1 class="text-3xl font-semibold text-slate-900">
+            {{-- HEADER PROPERTI --}}
+            <div data-property-heading class="mt-5">
+                <h1 data-motion-hero class="text-3xl font-semibold text-slate-900">
                     {{ $property->name }}
                 </h1>
 
@@ -35,7 +40,7 @@
             </div>
 
             {{-- FOTO PROPERTI --}}
-            <div class="mt-8 overflow-hidden rounded-2xl bg-white">
+            <div data-property-gallery class="mt-8 overflow-hidden rounded-2xl bg-white">
                 @if ($property->image_path)
                     <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($property->image_path) }}"
                         alt="{{ $property->name }}" class="max-h-[450px] w-full object-cover">
@@ -47,9 +52,9 @@
             </div>
 
             {{-- FASILITAS UMUM --}}
-            <div class="mt-10 rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
+            <div data-property-section class="mt-10 rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
                 <div>
-                    <h2 class="text-2xl font-semibold text-slate-900">
+                    <h2 data-motion-reveal class="text-2xl font-semibold text-slate-900">
                         Fasilitas Umum
                     </h2>
 
@@ -59,20 +64,13 @@
                 </div>
 
                 @if ($property->facilities->isNotEmpty())
-                    <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                    <div data-property-facilities class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                         @foreach ($property->facilities as $facility)
-                            <div class="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                            <div data-property-facility-card class="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4 transition-shadow hover:shadow-md hover:shadow-slate-200/60">
 
                                 <div
                                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-900">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                                        stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M20 7h-9" />
-                                        <path d="M14 17H5" />
-                                        <circle cx="17" cy="17" r="3" />
-                                        <circle cx="7" cy="7" r="3" />
-                                    </svg>
+                                    <i data-feather="sliders" class="h-5 w-5"></i>
                                 </div>
 
                                 <div>
@@ -103,15 +101,15 @@
 
             {{-- PILIHAN KAMAR --}}
             <div class="mt-10" id="daftar-kamar">
-                <h2 class="text-2xl font-semibold text-slate-900">
+                <h2 data-motion-reveal class="text-2xl font-semibold text-slate-900">
                     Pilihan Kamar
                 </h2>
 
                 <p class="mt-2 text-sm text-slate-500">
-                    Pilih kamar dan periode sewa untuk memeriksa ketersediaannya.
+                    Lihat informasi lengkap kamar dan periksa ketersediaan pada halaman detail kamar.
                 </p>
 
-                <div class="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <div data-property-rooms class="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
 
                     @forelse($property->rooms as $room)
 
@@ -132,10 +130,9 @@
                                 default => 'bg-slate-100 text-slate-600',
                             };
 
-                            $isSelectedRoom = (int) $selectedRoomId === (int) $room->id;
                         @endphp
 
-                        <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <div data-property-room-card class="overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow duration-300 hover:shadow-xl hover:shadow-slate-200/60">
 
                             {{-- FOTO KAMAR --}}
                             @if ($room->image_path)
@@ -171,123 +168,10 @@
                                     {{ $statusLabel }}
                                 </span>
 
-                                {{-- FORM PEMILIHAN PERIODE --}}
-                                <form action="{{ route('guest.properties.show', $property->id) }}#daftar-kamar"
-                                    method="GET" class="mt-6 border-t border-slate-100 pt-5">
-                                    <input type="hidden" name="room_id" value="{{ $room->id }}">
-
-                                    <div>
-                                        <label for="start_date_{{ $room->id }}"
-                                            class="text-sm font-medium text-slate-700">
-                                            Tanggal mulai sewa
-                                        </label>
-
-                                        <input type="date" id="start_date_{{ $room->id }}" name="start_date"
-                                            value="{{ $isSelectedRoom ? $selectedStartDate : '' }}"
-                                            min="{{ now()->toDateString() }}" required
-                                            class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-900">
-                                    </div>
-
-                                    <div class="mt-4">
-                                        <label for="duration_month_{{ $room->id }}"
-                                            class="text-sm font-medium text-slate-700">
-                                            Durasi sewa
-                                        </label>
-
-                                        <select id="duration_month_{{ $room->id }}" name="duration_month" required
-                                            class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-900">
-                                            <option value="">Pilih durasi</option>
-
-                                            <option value="1" @selected($isSelectedRoom && $selectedDurationMonth === 1)>
-                                                1 Bulan
-                                            </option>
-
-                                            <option value="3" @selected($isSelectedRoom && $selectedDurationMonth === 3)>
-                                                3 Bulan
-                                            </option>
-
-                                            <option value="6" @selected($isSelectedRoom && $selectedDurationMonth === 6)>
-                                                6 Bulan
-                                            </option>
-                                        </select>
-                                    </div>
-
-                                    <button type="submit"
-                                        class="mt-5 w-full rounded-lg bg-blue-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-800">
-                                        Periksa Ketersediaan
-                                    </button>
-                                </form>
-
-                                {{-- HASIL PENGECEKAN PERIODE --}}
-                                @if ($isSelectedRoom && $availabilityCheck)
-                                    <div
-                                        class="mt-5 rounded-xl border p-4
-                            {{ $availabilityCheck['available'] ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50' }}">
-
-                                        <h4
-                                            class="text-sm font-semibold
-                                {{ $availabilityCheck['available'] ? 'text-green-800' : 'text-amber-800' }}">
-                                            {{ $availabilityCheck['available']
-                                                ? 'Kamar tersedia pada periode ini'
-                                                : 'Kamar tidak tersedia pada periode ini' }}
-                                        </h4>
-
-                                        <div class="mt-3 space-y-1 text-xs text-slate-600">
-                                            <p>
-                                                Mulai:
-                                                {{ \Carbon\Carbon::parse($selectedStartDate)->format('d M Y') }}
-                                            </p>
-
-                                            <p>
-                                                Selesai:
-                                                {{ \Carbon\Carbon::parse($availabilityEndDate)->format('d M Y') }}
-                                            </p>
-
-                                            <p>
-                                                Durasi:
-                                                {{ $selectedDurationMonth }} bulan
-                                            </p>
-                                        </div>
-
-                                        <p class="mt-3 text-sm leading-relaxed text-slate-700">
-                                            {{ $availabilityCheck['message'] }}
-                                        </p>
-
-
-                                        @if ($availabilityCheck['available'])
-                                            <form action="{{ route('tenant.bookings.store') }}" method="POST"
-                                                class="mt-4">
-                                                @csrf
-
-                                                <input type="hidden" name="room_id" value="{{ $room->id }}">
-
-                                                <input type="hidden" name="start_date" value="{{ $selectedStartDate }}">
-
-                                                <input type="hidden" name="duration_month"
-                                                    value="{{ $selectedDurationMonth }}">
-
-                                                @auth
-                                                    @if (auth()->user()->role === 'tenant')
-                                                        <button type="submit"
-                                                            class="w-full rounded-lg bg-blue-900 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-800">
-                                                            Booking Kamar
-                                                        </button>
-                                                    @else
-                                                        <p class="text-xs text-amber-800">
-                                                            Login menggunakan akun penyewa untuk melakukan booking.
-                                                        </p>
-                                                    @endif
-                                                @else
-                                                    <a href="{{ route('login') }}"
-                                                        class="block w-full rounded-lg bg-blue-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-blue-800">
-                                                        Login untuk Booking
-                                                    </a>
-                                                @endauth
-                                            </form>
-                                        @endif
-
-                                    </div>
-                                @endif
+                                <a href="{{ route('guest.rooms.show', $room->room_code) }}"
+                                    class="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-blue-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-800">
+                                    Lihat Detail & Cek Ketersediaan
+                                </a>
 
                             </div>
                         </div>
@@ -306,10 +190,10 @@
 
 
             {{-- LOKASI KOST --}}
-            <div class="mt-10 rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
+            <div data-property-map-panel class="mt-10 rounded-2xl border border-slate-200 bg-white p-6 md:p-8">
 
                 <div>
-                    <h2 class="text-2xl font-semibold text-slate-900">
+                    <h2 data-motion-reveal class="text-2xl font-semibold text-slate-900">
                         Lokasi Kost
                     </h2>
 

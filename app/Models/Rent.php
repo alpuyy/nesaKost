@@ -21,6 +21,12 @@ class Rent extends Model
         'total_price',
     ];
 
+    /** URL menggunakan kode sewa, bukan primary key internal. */
+    public function getRouteKeyName(): string
+    {
+        return 'rent_code';
+    }
+
     protected function casts(): array
     {
         return [
@@ -52,4 +58,13 @@ class Rent extends Model
     {
         return $this->hasMany(Booking::class, 'previous_rent_id');
     }
+
+    /**
+     * Riwayat status pengiriman email pengingat masa sewa.
+     */
+    public function expirationReminderEmails(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RentExpirationReminderEmail::class, 'rent_id');
+    }
+
 }

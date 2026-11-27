@@ -14,6 +14,7 @@ class BranchDorm extends Model
     protected $fillable = [
         'owner_id',
         'name',
+        'slug',
         'address',
         'latitude',
         'longitude',
@@ -21,6 +22,11 @@ class BranchDorm extends Model
         'image_path',
         'status',
     ];
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
 
     public function owner(): BelongsTo
     {
@@ -40,6 +46,11 @@ class BranchDorm extends Model
     public function rooms(): HasMany
     {
         return $this->hasMany(Room::class, 'branch_dorm_id');
+    }
+
+    public function housemaids(): BelongsToMany
+    {
+        return $this->belongsToMany(Housemaid::class, 'housemaid_branch', 'branch_dorm_id', 'housemaid_id');
     }
 
     public function getBranchCodeAttribute(): string

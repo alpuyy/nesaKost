@@ -15,6 +15,7 @@ use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class BranchDormController extends Controller
 {
@@ -81,7 +82,11 @@ class BranchDormController extends Controller
     {
         $this->authorizeBranch($branch);
 
-        $branch->load(['owner.user', 'facilities', 'rooms']);
+        $branch->load([
+            'owner.user',
+            'facilities' => fn ($query) => $query->where('facility.facility_type', 'branch')->orderBy('facility_name'),
+            'rooms',
+        ]);
         $totalRooms = $branch->rooms->count();
         $occupiedRooms = $branch->rooms->whereIn('status', ['occupied', 'terisi'])->count();
         $availableRooms = $branch->rooms->whereIn('status', ['available', 'kosong'])->count();
@@ -97,7 +102,7 @@ class BranchDormController extends Controller
     public function create(): View
     {
         $owner = $this->currentOwner();
-        $facilities = Facility::orderBy('facility_name')->get();
+        $facilities = Facility::where('owner_id', $owner->id)->where('facility_type', 'branch')->orderBy('facility_name')->get();
 
         return view('pages.owner.branches.create', compact('owner', 'facilities'));
     }
@@ -112,7 +117,7 @@ class BranchDormController extends Controller
             'gender_type' => ['required', Rule::in(['putra', 'putri', 'campuran'])],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'facilities' => ['nullable', 'array'],
-            'facilities.*' => ['integer', 'distinct', 'exists:facility,id'],
+            'facilities.*' => ['integer', 'distinct', Rule::exists('facility', 'id')->where(fn ($query) => $query->where('owner_id', $this->currentOwner()->id)->where('facility_type', 'branch'))],
         ];
     }
 
@@ -142,6 +147,8 @@ class BranchDormController extends Controller
                 'status' => $validated['status'],
             ]);
 
+            $branch->update(['slug' => (Str::slug($branch->name) ?: 'kost') . '-' . $branch->id]);
+
             $branch->facilities()->sync($validated['facilities'] ?? []);
 
             return $branch;
@@ -157,7 +164,7 @@ class BranchDormController extends Controller
         $this->authorizeBranch($branch);
 
         $branch->load(['owner.user', 'facilities', 'rooms']);
-        $facilities = Facility::orderBy('facility_name')->get();
+        $facilities = Facility::where('owner_id', $this->currentOwner()->id)->where('facility_type', 'branch')->orderBy('facility_name')->get();
         $selectedFacilities = $branch->facilities->pluck('id')->all();
         $totalRooms = $branch->rooms->count();
         $occupiedRooms = $branch->rooms->whereIn('status', ['occupied', 'terisi'])->count();
@@ -178,6 +185,8 @@ class BranchDormController extends Controller
         $validated = $request->validate($this->branchRules(), $this->branchMessages());
 
         DB::transaction(function () use ($validated, $branch) {
+            $wasActive = $branch->status === 'active';
+
             $branch->update([
                 'name' => $validated['name'],
                 'address' => $validated['address'],
@@ -188,6 +197,28 @@ class BranchDormController extends Controller
             ]);
 
             $branch->facilities()->sync($validated['facilities'] ?? []);
+
+            // Kebijakan ART: penempatan dilepas saat cabang dinonaktifkan.
+            if ($wasActive && $validated['status'] === 'inactive') {
+                $assignedHousemaidIds = DB::table('housemaid_branch')
+                    ->where('branch_dorm_id', $branch->id)
+                    ->pluck('housemaid_id');
+
+                DB::table('housemaid_branch')->where('branch_dorm_id', $branch->id)->delete();
+
+                // ART aktif tanpa cabang aktif tersisa otomatis dinonaktifkan.
+                DB::table('housemaid')
+                    ->whereIn('id', $assignedHousemaidIds)
+                    ->where('status', 'active')
+                    ->whereNotExists(function ($query) {
+                        $query->selectRaw('1')
+                            ->from('housemaid_branch as hb')
+                            ->join('branch_dorm as bd', 'bd.id', '=', 'hb.branch_dorm_id')
+                            ->whereColumn('hb.housemaid_id', 'housemaid.id')
+                            ->where('bd.status', 'active');
+                    })
+                    ->update(['status' => 'inactive', 'updated_at' => now()]);
+            }
         });
 
         return redirect()
@@ -439,9 +470,29 @@ private function searchNominatim(string $query): array
         }
 
         DB::transaction(function () use ($branch) {
+            $assignedHousemaidIds = DB::table('housemaid_branch')
+                ->where('branch_dorm_id', $branch->id)
+                ->pluck('housemaid_id');
+
+            // Hapus relasi ART secara eksplisit sebelum menghapus cabang.
+            DB::table('housemaid_branch')->where('branch_dorm_id', $branch->id)->delete();
             $branch->facilities()->detach();
             DB::table('manager_branch')->where('branch_dorm_id', $branch->id)->delete();
             $branch->delete();
+
+            // Jika cabang yang dihapus adalah penempatan terakhir ART aktif,
+            // status ART otomatis berubah menjadi nonaktif.
+            DB::table('housemaid')
+                ->whereIn('id', $assignedHousemaidIds)
+                ->where('status', 'active')
+                ->whereNotExists(function ($query) {
+                    $query->selectRaw('1')
+                        ->from('housemaid_branch as hb')
+                        ->join('branch_dorm as bd', 'bd.id', '=', 'hb.branch_dorm_id')
+                        ->whereColumn('hb.housemaid_id', 'housemaid.id')
+                        ->where('bd.status', 'active');
+                })
+                ->update(['status' => 'inactive', 'updated_at' => now()]);
         });
 
         return redirect()
